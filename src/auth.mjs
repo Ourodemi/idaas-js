@@ -3,13 +3,9 @@
  * MIT Licensed
  */
 
-const axios = require('axios');
+import axios from 'axios';
 
 class IDaaSModule{
-    refreshToken = null;
-    accessToken = null;
-    captchaToken = null;
-
     apiVersion = 'v1';
     isRefreshing = false;
 
@@ -19,10 +15,10 @@ class IDaaSModule{
     constructor(domain){
         this.domain = domain;
         
-        this.refreshToken = this.getLocalStorageItem('refresh-token');
+        this.refreshToken = this.getLocalStorageItem('refresh-token') || undefined;
         this.refreshTokenExpiry = this.getLocalStorageItem('refresh-token-expiry') || 0;
 
-        this.accessToken = this.getLocalStorageItem('access-token');
+        this.accessToken = this.getLocalStorageItem('access-token') || undefined;
         this.accessTokenExpiry = this.getLocalStorageItem('access-token-expiry') || 0;        
     }
 
@@ -297,4 +293,4 @@ class IDaaSModule{
     }
 }
 
-module.exports = IDaaSModule;
+export default IDaaSModule;
