@@ -3,14 +3,14 @@
  * MIT Licensed
  */
 
-import axios from 'axios';
+const axios = require('axios');
 
 class IDaaSModule{
     apiVersion = 'v1';
     isRefreshing = false;
 
     localStoragePrefix = 'idaas-';
-    deauthHandlser = function(){};
+    deauthHandler = function(){};
 
     constructor(domain){
         this.domain = domain;
@@ -293,4 +293,4 @@ class IDaaSModule{
     }
 }
 
-export default IDaaSModule;
+module.exports = IDaaSModule;
