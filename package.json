@@ -1,0 +1,14 @@
+{
+  "name": "@ourodemi/idaas-js",
+  "version": "1.0.0",
+  "description": "Front-end JS SDK to implement Ourodemi's IDaaS API",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Ourodemi",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^0.24.0"
+  }
+}
