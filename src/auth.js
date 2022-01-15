@@ -10,7 +10,6 @@
      accessToken = null;
      captchaToken = null;
  
-     domain = null;
      apiVersion = 'v1';
      isRefreshing = false;
  

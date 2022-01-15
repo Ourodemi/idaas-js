@@ -2,9 +2,13 @@
   "name": "@ourodemi/idaas-js",
   "version": "1.0.0",
   "description": "Front-end JS SDK to implement Ourodemi's IDaaS API",
-  "main": "index.js",
+  "main": "./index.js",
+  "types":"./index.d.ts",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "author": "Ourodemi",
   "license": "MIT",
