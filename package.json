@@ -1,6 +1,6 @@
 {
   "name": "@ourodemi/idaas-js",
-  "version": "1.0.1",
+  "version": "1.0.6",
   "description": "Front-end JS SDK to implement Ourodemi's IDaaS API",
   "main": "./index.js",
   "types": "./index.d.ts",
@@ -12,7 +12,9 @@
     "access": "public"
   },
   "files": [
-    "dist"
+    "src/*",
+    "index.js",
+    "index.js.map"
   ],
   "author": "Ourodemi",
   "license": "MIT",
