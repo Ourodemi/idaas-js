@@ -4,7 +4,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
  * Ourodemi IDaaS React SDK
  * MIT Licensed
  */
-const axios = require('axios');
+const axios = require('axios').default;
 
 class IDaaSModule {
   constructor(domain) {
@@ -291,6 +291,21 @@ class IDaaSModule {
 
         this.setLocalStorageItem('user-data', JSON.stringify(data.data));
         resolve(data.data);
+      }).catch(err => {
+        resolve(false);
+      });
+    });
+  }
+
+  async createUser(user, captcha, captchaToken) {
+    return new Promise(async (resolve, reject) => {
+      await axios.post(this.uri('user'), user, {
+        headers: {
+          'x-captcha-token': captchaToken,
+          'x-captcha-string': captcha
+        }
+      }).then(res => {
+        resolve(true);
       }).catch(err => {
         resolve(false);
       });

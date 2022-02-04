@@ -3,7 +3,7 @@
  * MIT Licensed
  */
 
-const axios = require('axios');
+const axios = require('axios').default;
 
 class IDaaSModule{
     apiVersion = 'v1';
@@ -267,6 +267,21 @@ class IDaaSModule{
             }).catch(err => {
                 resolve(false);
             });
+        });
+    }
+
+    async createUser(user, captcha, captchaToken){
+        return new Promise(async (resolve, reject) => {
+            await axios.post(this.uri('user'), user, {
+                headers: {
+                    'x-captcha-token': captchaToken,
+                    'x-captcha-string': captcha
+                }
+            }).then((res) => {
+                resolve(true);
+            }).catch(err => {
+                resolve(false);
+            })
         });
     }
 
