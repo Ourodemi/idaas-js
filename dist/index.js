@@ -72,6 +72,7 @@ class IDaaSModule {
           return false;
         }
 
+        user.full_name = this.get_full_name(user);
         this.setLocalStorageItem('refresh-token', refreshToken);
         this.setLocalStorageItem('access-token', accessToken);
         this.setLocalStorageItem('refresh-token-expiry', refreshTokenExpiry);
@@ -212,6 +213,7 @@ class IDaaSModule {
           });
         }
 
+        user.full_name = this.get_full_name(user);
         this.setLocalStorageItem('access-token', accessToken);
         this.setLocalStorageItem('user-data', JSON.stringify(user));
         this.setLocalStorageItem('access-token-expiry', expiry);
@@ -285,12 +287,15 @@ class IDaaSModule {
         data,
         status
       }) => {
+        let user = data.data;
+
         if (status != 200) {
           return resolve(false);
         }
 
-        this.setLocalStorageItem('user-data', JSON.stringify(data.data));
-        resolve(data.data);
+        user.full_name = this.get_full_name(user);
+        this.setLocalStorageItem('user-data', JSON.stringify(user));
+        resolve(user);
       }).catch(err => {
         resolve(false);
       });
@@ -314,6 +319,15 @@ class IDaaSModule {
 
   _timestamp_() {
     return Math.floor(Date.now() / 1000);
+  }
+
+  get_full_name(user) {
+    let {
+      first_name,
+      last_name,
+      middle_name
+    } = user;
+    return `${first_name} ${middle_name ? middle_name + ' ' : ''}${last_name}`;
   }
 
   uri(e) {

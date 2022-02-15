@@ -16,11 +16,35 @@ export default class IDaaSModule{
     public async deauth(): void;
     public async isAuthenticated(): Promise;
     public async newAccessToken(force: boolean): boolean;
-    public async getUser(): object;
+    public async getUser(): {
+        user_id: string,
+        username: string,
+        full_name: string,
+        first_name: string,
+        middle_name: string,
+        last_name: string,
+        email: string,
+        groups: string
+    };
     public async request(handler: function): void;
     
+    /**
+     * Creates a new user
+     * @param user 
+     * @param captcha 
+     * @param captchaToken 
+     */
     public async createUser(
-        user: object, 
+        user: {
+            first_name: string,
+            middle_name: string,
+            last_name: string,
+            display_name: string,
+            date_of_birth: string,
+            email: string,
+            password: string,
+            username: string
+        },
         captcha: string, 
         captchaToken: string
     ): Promise;
