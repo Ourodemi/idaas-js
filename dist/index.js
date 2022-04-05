@@ -1,5 +1,7 @@
 function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 
+/* eslint-disable */
+
 /** Official Ourodemi Identity React SDK **/
 const axios = require('axios').default;
 
@@ -418,6 +420,8 @@ class IDaaSModule {
       this.localIdentity = { ...this.localIdentityDefaults
       };
       this.commitLocalIdentity();
+    } finally {
+      Object.keys(this.localIdentity).map(key => this[key] = this.localIdentity[key]);
     }
   }
 
