@@ -12,34 +12,42 @@ class IDaaSModule {
 
     _defineProperty(this, "isRefreshing", false);
 
+    _defineProperty(this, "accessTokenStatus", false);
+
     _defineProperty(this, "localStoragePrefix", 'idaas-');
 
     _defineProperty(this, "deauthHandler", function () {});
 
-    this.domain = domain;
-    this.refreshToken = this.getLocalStorageItem('refresh-token') || undefined;
-    this.refreshTokenExpiry = this.getLocalStorageItem('refresh-token-expiry') || 0;
-    this.accessToken = this.getLocalStorageItem('access-token') || undefined;
-    this.accessTokenExpiry = this.getLocalStorageItem('access-token-expiry') || 0;
+    this.domain = domain; // test
+
+    this.refresh_token = this.getLocalStorageItem('refresh-token') || undefined;
+    this.refresh_token_expiry = this.getLocalStorageItem('refresh-token-expiry') || 0;
+    this.access_token = this.getLocalStorageItem('access-token') || undefined;
+    this.access_token_expiry = this.getLocalStorageItem('access-token-expiry') || 0;
   }
 
   async isAuthenticated() {
-    // check for a valid refresh token
-    if (!this.refreshToken || this._timestamp_() > this.refreshTokenExpiry) {
-      return false;
-    } // check for a valid refresh token
+    return new Promise(async (resolve, reject) => {
+      // check for a valid refresh token
+      let i = Math.random() * 100;
+
+      if (!this.refresh_token || this._timestamp_() > this.refresh_token_expiry) {
+        return resolve(false);
+      } // check for a valid access token
 
 
-    if (this.accessToken && this.accessTokenExpiry > this._timestamp_()) {
-      return true;
-    } // try to obtain a new access token
+      if (this.access_token && this.access_token_expiry > this._timestamp_()) {
+        this.accessTokenStatus = true;
+        return resolve(true);
+      } // try to obtain a new access token
 
 
-    if (!(await this.newAccessToken())) {
-      return false;
-    }
+      if (!(await this.newAccessToken())) {
+        return resolve(false);
+      }
 
-    return true;
+      resolve(true);
+    });
   }
 
   async auth({
@@ -61,27 +69,27 @@ class IDaaSModule {
         }
 
         let {
-          refreshToken,
-          accessToken,
-          refreshTokenExpiry,
-          accessTokenExpiry,
+          refresh_token,
+          access_token,
+          refresh_token_expiry,
+          access_token_expiry,
           user
         } = data.data;
 
-        if (!refreshToken) {
+        if (!refresh_token) {
           return false;
         }
 
         user.full_name = this.get_full_name(user);
-        this.setLocalStorageItem('refresh-token', refreshToken);
-        this.setLocalStorageItem('access-token', accessToken);
-        this.setLocalStorageItem('refresh-token-expiry', refreshTokenExpiry);
-        this.setLocalStorageItem('access-token-expiry', accessTokenExpiry);
+        this.setLocalStorageItem('refresh-token', refresh_token);
+        this.setLocalStorageItem('access-token', access_token);
+        this.setLocalStorageItem('refresh-token-expiry', refresh_token_expiry);
+        this.setLocalStorageItem('access-token-expiry', access_token_expiry);
         this.setLocalStorageItem('user-data', JSON.stringify(user));
-        this.refreshToken = refreshToken;
-        this.refreshTokenExpiry = refreshTokenExpiry;
-        this.accessTokenExpiry = accessTokenExpiry;
-        this.accessToken = accessToken;
+        this.refresh_token = refresh_token;
+        this.refresh_token_expiry = refresh_token_expiry;
+        this.access_token_expiry = access_token_expiry;
+        this.access_token = access_token;
         resolve(true);
       }).catch(err => {
         resolve(false);
@@ -101,14 +109,14 @@ class IDaaSModule {
     phone
   }) {
     return new Promise(async (resolve, reject) => {
-      if (!this.captchaToken) {
+      if (!this.captcha_token) {
         return resolve(false);
       }
 
       axios.get(this.uri('sso'), {
         headers: {
-          'x-captcha-token': this.captchaToken,
-          'x-captcha-code': captcha
+          'x-captcha-token': this.captcha_token,
+          'x-captcha-string': captcha
         },
         query: {
           email,
@@ -118,11 +126,6 @@ class IDaaSModule {
         data,
         status
       }) => {
-        /**
-         * 404 - invalid email
-         * 401 - invalid captcha attempt
-         * 429 - too many sso requests
-         */
         resolve(status);
       }).catch(err => {
         resolve(false);
@@ -140,27 +143,31 @@ class IDaaSModule {
 
   async deauth() {
     return new Promise(async (resolve, reject) => {
-      if (!this.refreshToken) {
+      if (!this.refresh_token) {
         return resolve(false);
       }
 
-      this.removeLocalStorageItem('refresh-token');
-      this.removeLocalStorageItem('access-token');
-      this.removeLocalStorageItem('refresh-token-expiry');
-      this.removeLocalStorageItem('access-token-expiry');
-      this.removeLocalStorageItem('user-data');
+      this.cleanup();
       axios.delete(this.uri('auth'), {
         headers: {
-          'x-refresh-token': this.refreshToken
+          'x-refresh-token': this.refresh_token
         }
       }).then(res => {
         resolve(true);
       }).catch(err => {
         resolve(false);
       });
-      this.refreshToken = null;
-      this.accessToken = null;
+      this.refresh_token = null;
+      this.access_token = null;
     });
+  }
+
+  cleanup() {
+    this.removeLocalStorageItem('refresh-token');
+    this.removeLocalStorageItem('access-token');
+    this.removeLocalStorageItem('refresh-token-expiry');
+    this.removeLocalStorageItem('access-token-expiry');
+    this.removeLocalStorageItem('user-data');
   }
   /**
    * 
@@ -172,41 +179,43 @@ class IDaaSModule {
 
   async newAccessToken(force = false) {
     return new Promise(async (resolve, reject) => {
-      if (!this.refreshToken) {
-        this.deauthHandler(false);
-        return resolve(false);
-      }
-
       if (this.isRefreshing) {
+        var that = this;
         let intervalId = setInterval(() => {
           if (!this.isRefreshing) {
             clearInterval(intervalId);
-            resolve(true);
+            resolve(that.accessTokenStatus);
           }
         }, 500);
         return;
       }
 
-      if (this.accessTokenExpiry > this._timestamp_() && !force) {
-        return resolve(true);
+      if (!this.refresh_token) {
+        this.accessTokenStatus = false;
+        this.isRefreshing = false;
+        this.cleanup();
+        this.deauthHandler(false);
+        return resolve(false);
       }
 
       this.isRefreshing = true;
       await axios.get(this.uri('auth'), {
         headers: {
-          'x-refresh-token': this.refreshToken
+          'x-refresh-token': this.refresh_token
         }
       }).then(({
         data,
         status
       }) => {
         let {
-          accessToken,
-          expiry,
+          access_token,
+          access_token_expiry,
           user
         } = data.data;
 
-        if (!accessToken) {
+        if (!access_token) {
+          this.cleanup();
+          this.accessTokenStatus = false;
           resolve(false);
           return this.deauthHandler({
             status
@@ -214,12 +223,13 @@ class IDaaSModule {
         }
 
         user.full_name = this.get_full_name(user);
-        this.setLocalStorageItem('access-token', accessToken);
+        this.access_token = access_token;
+        this.access_token_expiry = access_token_expiry;
+        this.accessTokenStatus = true;
+        this.setLocalStorageItem('access-token', access_token);
         this.setLocalStorageItem('user-data', JSON.stringify(user));
         this.setLocalStorageItem('access-token-expiry', expiry);
-        this.accessToken = accessToken;
-        this.accessTokenExpiry = expiry;
-        resolve(data.data);
+        resolve(true);
       }).catch(err => {
         resolve(false);
         return this.deauthHandler({
@@ -249,15 +259,15 @@ class IDaaSModule {
 
 
   async request(handler) {
-    if (this._timestamp_() > this.refreshTokenExpiry) {
+    if (this._timestamp_() > this.refresh_token_expiry) {
       return this.deauthHandler();
     }
 
-    if (this._timestamp_() > this.accessTokenExpiry) {
+    if (this._timestamp_() > this.access_token_expiry) {
       await this.newAccessToken();
     }
 
-    handler(this.accessToken);
+    handler(this.access_token);
   }
 
   setDeauthHandler(handler) {
@@ -281,7 +291,7 @@ class IDaaSModule {
 
       await axios.get(this.uri('user'), {
         headers: {
-          'x-access-token': this.accessToken
+          'x-access-token': this.access_token
         }
       }).then(({
         data,
@@ -302,19 +312,77 @@ class IDaaSModule {
     });
   }
 
-  async createUser(user, captcha, captchaToken) {
+  async createRegistrationToken(user, captcha, captcha_token) {
     return new Promise(async (resolve, reject) => {
       await axios.post(this.uri('user'), user, {
         headers: {
-          'x-captcha-token': captchaToken,
+          'x-captcha-token': captcha_token,
           'x-captcha-string': captcha
         }
-      }).then(res => {
-        resolve(true);
-      }).catch(err => {
-        resolve(false);
-      });
+      }).then(({
+        data,
+        status
+      }) => {
+        let code = data.code;
+        let {
+          registration_token
+        } = data.data || {};
+        resolve({
+          code,
+          status,
+          registration_token
+        });
+      }).catch(({
+        response
+      }) => resolve(this.expandResponse(response.data)));
     });
+  }
+
+  async verifyRegistration(registration_token, verification_code, login = true) {
+    return new Promise(async (resolve, reject) => {
+      await axios.patch(this.uri('user'), {
+        registration_token,
+        verification_code
+      }).then(({
+        data,
+        status
+      }) => {
+        let code = data.code;
+
+        if (status == 200 && login) {
+          let {
+            refresh_token,
+            access_token,
+            refresh_token_expiry,
+            access_token_expiry,
+            user
+          } = data.data || {};
+          user.full_name = this.get_full_name(user);
+          this.accessTokenStatus = true;
+          this.setLocalStorageItem('refresh-token', refresh_token);
+          this.setLocalStorageItem('access-token', access_token);
+          this.setLocalStorageItem('refresh-token-expiry', refresh_token_expiry);
+          this.setLocalStorageItem('access-token-expiry', access_token_expiry);
+          this.setLocalStorageItem('user-data', JSON.stringify(user));
+        }
+
+        resolve({
+          code,
+          status,
+          ...(data.data || {})
+        });
+      }).catch(({
+        response
+      }) => resolve(this.expandResponse(response.data)));
+    });
+  }
+
+  expandResponse(res) {
+    return {
+      status: res.status || 500,
+      code: res.code || 'connection_failure',
+      ...(res.data || {})
+    };
   }
 
   _timestamp_() {
@@ -333,6 +401,10 @@ class IDaaSModule {
   uri(e) {
     return `https://${this.domain}/${this.apiVersion}/${e}`;
   }
+
+  updateLocalObject(obj) {}
+
+  getLocalObject(obj) {}
   /* LOCAL STORAGE WARPPERS FOR PREFIXING */
 
 
