@@ -1,6 +1,6 @@
 {
   "name": "@ourodemi/idaas-js",
-  "version": "1.3.3",
+  "version": "1.3.4",
   "description": "Front-end JS SDK to implement Ourodemi's IDaaS API",
   "main": "index.js",
   "types": "dist/index.d.ts",

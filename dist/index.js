@@ -406,9 +406,9 @@ class IDaaSModule {
   }
 
   clearLocalIdentity() {
-    Object.keys(obj).map(key => this[key] = undefined);
     this.localIdentity = { ...this.localIdentityDefaults
     };
+    Object.keys(this.localIdentity).map(key => this[key] = undefined);
     this.commitLocalIdentity();
   }
 
