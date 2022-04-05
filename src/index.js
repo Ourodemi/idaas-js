@@ -190,9 +190,9 @@
 
                 resolve(true);
             }).catch(err => {
-            this.isRefreshing = false;
-            resolve(false);
-            return this.deauthHandler({ status: 500 })
+                this.isRefreshing = false;
+                resolve(false);
+                return this.deauthHandler({ status: 500 })
             });
         });
      }
@@ -243,13 +243,14 @@
                 headers:{
                     'x-access-token':this.access_token
                 }
-            }).then(({data, status}) => {
-                let user = data.data;
+            }).then((res) => {
+                const { data, status } = res.data;
 
-                if ( status != 200 && status != 201 ){
+                if ( status !== 200 && status !== 201 ){
                     return resolve(false);
                 }
-
+                
+                let { user } = data;
                 user.full_name = this.get_full_name(user);
                 this.updateLocalIdentity({ user });
 
@@ -267,8 +268,8 @@
                      'x-captcha-token': captcha_token,
                      'x-captcha-string': captcha
                  }
-             }).then(({data, status}) => {
-                 const { code, data = {} } = data;
+             }).then((res) => {
+                 const { code, data, status } = res.data;
                  
                  resolve({
                      code,
@@ -284,8 +285,8 @@
             await axios.patch(this.uri('user'), {
                 registration_token,
                 verification_code
-            }).then(({data, status}) => {
-                let { code, data = {} } = data;
+            }).then((res) => {
+                const { status, code, data = {} } = res.data;
 
                 if ( status == 200 ){
                     let {

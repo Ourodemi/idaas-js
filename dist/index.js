@@ -1,36 +1,39 @@
 function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 
-/**
- * Ourodemi IDaaS React SDK
- * MIT Licensed
- */
+/** Official Ourodemi Identity React SDK **/
 const axios = require('axios').default;
 
 class IDaaSModule {
-  constructor(domain) {
+  constructor(domain, options = {}) {
     _defineProperty(this, "apiVersion", 'v1');
 
     _defineProperty(this, "isRefreshing", false);
 
     _defineProperty(this, "accessTokenStatus", false);
 
-    _defineProperty(this, "localStoragePrefix", 'idaas-');
-
     _defineProperty(this, "deauthHandler", function () {});
 
-    this.domain = domain; // test
+    _defineProperty(this, "localIdentity", {});
 
-    this.refresh_token = this.getLocalStorageItem('refresh-token') || undefined;
-    this.refresh_token_expiry = this.getLocalStorageItem('refresh-token-expiry') || 0;
-    this.access_token = this.getLocalStorageItem('access-token') || undefined;
-    this.access_token_expiry = this.getLocalStorageItem('access-token-expiry') || 0;
+    _defineProperty(this, "localIdentityDefaults", {
+      refresh_token: undefined,
+      refresh_token_expiry: 0,
+      access_token: undefined,
+      access_token_expiry: 0,
+      user: {}
+    });
+
+    const {
+      apiVersion
+    } = options;
+    this.apiVersion = apiVersion;
+    this.domain = domain;
+    this.loadLocalIdentity();
   }
 
   async isAuthenticated() {
     return new Promise(async (resolve, reject) => {
       // check for a valid refresh token
-      let i = Math.random() * 100;
-
       if (!this.refresh_token || this._timestamp_() > this.refresh_token_expiry) {
         return resolve(false);
       } // check for a valid access token
@@ -42,11 +45,9 @@ class IDaaSModule {
       } // try to obtain a new access token
 
 
-      if (!(await this.newAccessToken())) {
-        return resolve(false);
-      }
-
-      resolve(true);
+      this.newAccessToken().then(status => {
+        resolve(status);
+      });
     });
   }
 
@@ -64,7 +65,7 @@ class IDaaSModule {
         data,
         status
       }) => {
-        if (status !== 200) {
+        if (status !== 200 && status !== 201) {
           return resolve(false);
         }
 
@@ -77,19 +78,17 @@ class IDaaSModule {
         } = data.data;
 
         if (!refresh_token) {
-          return false;
+          return resolve(false);
         }
 
         user.full_name = this.get_full_name(user);
-        this.setLocalStorageItem('refresh-token', refresh_token);
-        this.setLocalStorageItem('access-token', access_token);
-        this.setLocalStorageItem('refresh-token-expiry', refresh_token_expiry);
-        this.setLocalStorageItem('access-token-expiry', access_token_expiry);
-        this.setLocalStorageItem('user-data', JSON.stringify(user));
-        this.refresh_token = refresh_token;
-        this.refresh_token_expiry = refresh_token_expiry;
-        this.access_token_expiry = access_token_expiry;
-        this.access_token = access_token;
+        this.updateLocalIdentity({
+          refresh_token,
+          access_token,
+          refresh_token_expiry,
+          access_token_expiry,
+          user
+        });
         resolve(true);
       }).catch(err => {
         resolve(false);
@@ -147,7 +146,6 @@ class IDaaSModule {
         return resolve(false);
       }
 
-      this.cleanup();
       axios.delete(this.uri('auth'), {
         headers: {
           'x-refresh-token': this.refresh_token
@@ -157,17 +155,8 @@ class IDaaSModule {
       }).catch(err => {
         resolve(false);
       });
-      this.refresh_token = null;
-      this.access_token = null;
+      this.clearLocalIdentity();
     });
-  }
-
-  cleanup() {
-    this.removeLocalStorageItem('refresh-token');
-    this.removeLocalStorageItem('access-token');
-    this.removeLocalStorageItem('refresh-token-expiry');
-    this.removeLocalStorageItem('access-token-expiry');
-    this.removeLocalStorageItem('user-data');
   }
   /**
    * 
@@ -199,7 +188,7 @@ class IDaaSModule {
       }
 
       this.isRefreshing = true;
-      await axios.get(this.uri('auth'), {
+      axios.get(this.uri('auth'), {
         headers: {
           'x-refresh-token': this.refresh_token
         }
@@ -211,7 +200,7 @@ class IDaaSModule {
           access_token,
           access_token_expiry,
           user
-        } = data.data;
+        } = data.data || {};
 
         if (!access_token) {
           this.cleanup();
@@ -223,20 +212,21 @@ class IDaaSModule {
         }
 
         user.full_name = this.get_full_name(user);
-        this.access_token = access_token;
-        this.access_token_expiry = access_token_expiry;
+        this.updateLocalIdentity({
+          access_token,
+          access_token_expiry,
+          user
+        });
         this.accessTokenStatus = true;
-        this.setLocalStorageItem('access-token', access_token);
-        this.setLocalStorageItem('user-data', JSON.stringify(user));
-        this.setLocalStorageItem('access-token-expiry', expiry);
+        this.isRefreshing = false;
         resolve(true);
       }).catch(err => {
+        this.isRefreshing = false;
         resolve(false);
         return this.deauthHandler({
           status: 500
         });
       });
-      this.isRefreshing = false;
     });
   }
 
@@ -280,31 +270,31 @@ class IDaaSModule {
     }
 
     return new Promise(async (resolve, reject) => {
-      try {
-        let user = JSON.parse(this.getLocalStorageItem('user-data') || '{}');
-
-        if (user.user_id) {
-          return resolve(user);
-        }
-      } catch (e) {// move ahead
+      if (this.user.user_id) {
+        return resolve(this.user);
       }
 
       await axios.get(this.uri('user'), {
         headers: {
           'x-access-token': this.access_token
         }
-      }).then(({
-        data,
-        status
-      }) => {
-        let user = data.data;
+      }).then(res => {
+        const {
+          data,
+          status
+        } = res.data;
 
-        if (status != 200) {
+        if (status !== 200 && status !== 201) {
           return resolve(false);
         }
 
+        let {
+          user
+        } = data;
         user.full_name = this.get_full_name(user);
-        this.setLocalStorageItem('user-data', JSON.stringify(user));
+        this.updateLocalIdentity({
+          user
+        });
         resolve(user);
       }).catch(err => {
         resolve(false);
@@ -319,18 +309,16 @@ class IDaaSModule {
           'x-captcha-token': captcha_token,
           'x-captcha-string': captcha
         }
-      }).then(({
-        data,
-        status
-      }) => {
-        let code = data.code;
-        let {
-          registration_token
-        } = data.data || {};
+      }).then(res => {
+        const {
+          code,
+          data,
+          status
+        } = res.data;
         resolve({
           code,
           status,
-          registration_token
+          registration_token: data.registration_token
         });
       }).catch(({
         response
@@ -338,38 +326,41 @@ class IDaaSModule {
     });
   }
 
-  async verifyRegistration(registration_token, verification_code, login = true) {
+  async verifyRegistration(registration_token, verification_code) {
     return new Promise(async (resolve, reject) => {
       await axios.patch(this.uri('user'), {
         registration_token,
         verification_code
-      }).then(({
-        data,
-        status
-      }) => {
-        let code = data.code;
+      }).then(res => {
+        const {
+          status,
+          code,
+          data = {}
+        } = res.data;
 
-        if (status == 200 && login) {
+        if (status == 200) {
           let {
             refresh_token,
             access_token,
             refresh_token_expiry,
             access_token_expiry,
             user
-          } = data.data || {};
+          } = data;
           user.full_name = this.get_full_name(user);
           this.accessTokenStatus = true;
-          this.setLocalStorageItem('refresh-token', refresh_token);
-          this.setLocalStorageItem('access-token', access_token);
-          this.setLocalStorageItem('refresh-token-expiry', refresh_token_expiry);
-          this.setLocalStorageItem('access-token-expiry', access_token_expiry);
-          this.setLocalStorageItem('user-data', JSON.stringify(user));
+          this.updateLocalIdentity({
+            refresh_token,
+            access_token,
+            refresh_token_expiry,
+            access_token_expiry,
+            user
+          });
         }
 
         resolve({
           code,
           status,
-          ...(data.data || {})
+          ...(data || {})
         });
       }).catch(({
         response
@@ -390,7 +381,7 @@ class IDaaSModule {
   }
 
   get_full_name(user) {
-    let {
+    const {
       first_name,
       last_name,
       middle_name
@@ -400,24 +391,50 @@ class IDaaSModule {
 
   uri(e) {
     return `https://${this.domain}/${this.apiVersion}/${e}`;
+  } // a local identity should be isolated into another class
+  // instead of being expanded globally
+
+
+  updateLocalIdentity(obj) {
+    this.localIdentity = { ...this.localIdentity,
+      ...obj
+    };
+    Object.keys(obj).map(key => this[key] = obj[key]);
+    this.commitLocalIdentity();
   }
 
-  updateLocalObject(obj) {}
+  clearLocalIdentity() {
+    Object.keys(obj).map(key => this[key] = undefined);
+    this.localIdentity = { ...this.localIdentityDefaults
+    };
+    this.commitLocalIdentity();
+  }
 
-  getLocalObject(obj) {}
-  /* LOCAL STORAGE WARPPERS FOR PREFIXING */
+  loadLocalIdentity() {
+    try {
+      this.localIdentity = JSON.parse(this.getLocalStorageItem(':identity:0')) || { ...this.localIdentityDefaults
+      };
+    } catch (e) {
+      this.localIdentity = { ...this.localIdentityDefaults
+      };
+      this.commitLocalIdentity();
+    }
+  }
 
+  commitLocalIdentity() {
+    this.setLocalStorageItem(':identity:0', JSON.stringify(this.localIdentity));
+  }
 
   getLocalStorageItem(key) {
-    return localStorage.getItem(`${this.localStoragePrefix + key}`);
+    return localStorage.getItem(`${this.domain + key}`);
   }
 
   setLocalStorageItem(key, value) {
-    return localStorage.setItem(`${this.localStoragePrefix + key}`, value);
+    return localStorage.setItem(`${this.domain + key}`, value);
   }
 
   removeLocalStorageItem(key) {
-    return localStorage.removeItem(`${this.localStoragePrefix + key}`);
+    return localStorage.removeItem(`${this.domain + key}`);
   }
 
 }
