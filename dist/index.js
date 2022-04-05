@@ -26,7 +26,7 @@ class IDaaSModule {
     const {
       apiVersion
     } = options;
-    this.apiVersion = apiVersion;
+    this.apiVersion = apiVersion || 'v1';
     this.domain = domain;
     this.loadLocalIdentity();
   }
